@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Legendary Flashcards</title>
+    <title>Legendary Flashcards V2</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -14,23 +14,31 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style>
-        /* Card Flip Animation */
+        /* CSS เดิมที่ยังคงความขลัง */
         .perspective-1000 { perspective: 1000px; }
         .transform-style-3d { transform-style: preserve-3d; }
         .backface-hidden { backface-visibility: hidden; }
         .rotate-y-180 { transform: rotateY(180deg); }
         .no-tap-highlight { -webkit-tap-highlight-color: transparent; }
+        
+        /* Animation สำหรับ Fuzzing Effect */
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(72, 187, 120, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(72, 187, 120, 0); }
+        }
+        .animate-pulse-green { animation: pulse-green 0.5s; }
     </style>
 </head>
 <body class="bg-gray-900 h-screen flex flex-col text-white font-sans overflow-hidden select-none">
 
-    <header class="px-6 py-4 bg-gray-800 shadow-md flex justify-between items-center z-10">
+    <header class="px-6 py-4 bg-gray-800 shadow-md flex justify-between items-center z-10 border-b border-gray-700">
         <div>
-            <h1 class="text-xl font-bold text-indigo-400">Legendary Cards</h1>
-            <p id="due-counter" class="text-xs text-gray-400">รอทบทวน: 0 ใบ</p>
+            <h1 class="text-xl font-bold text-indigo-400">Legendary Cards <span class="text-xs text-gray-500 bg-gray-900 px-2 rounded border border-gray-700">V2.0</span></h1>
+            <p id="due-counter" class="text-xs text-gray-400 mt-1">กำลังคำนวณ...</p>
         </div>
-        <button onclick="resetData()" class="text-gray-500 text-xs hover:text-red-400">
-            <i class="fas fa-trash"></i> Reset
+        <button onclick="resetData()" class="text-gray-500 text-xs hover:text-red-400 p-2">
+            <i class="fas fa-trash"></i>
         </button>
     </header>
 
@@ -38,167 +46,215 @@
         
         <div id="scene-home" class="absolute inset-0 flex flex-col items-center justify-center p-6 space-y-6 transition-opacity duration-300">
             <div class="text-center space-y-2">
-                <div class="inline-block p-4 rounded-full bg-gray-800 shadow-lg mb-2">
-                    <i class="fas fa-brain text-4xl text-indigo-500"></i>
+                <div class="inline-block p-4 rounded-full bg-gray-800 shadow-lg mb-2 relative">
+                    <i class="fas fa-graduation-cap text-4xl text-indigo-500"></i>
+                    <span id="badge-count" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-6 h-6 flex items-center justify-center rounded-full hidden">0</span>
                 </div>
-                <h2 class="text-2xl font-bold">พร้อมฝึกสมองไหม?</h2>
-                <p class="text-gray-400 text-sm">ระบบ Spaced Repetition พร้อมใช้งาน</p>
+                <h2 class="text-2xl font-bold text-gray-100">Deck ของคุณ</h2>
+                <p id="stats-text" class="text-gray-400 text-sm">พร้อมฝึกสมองหรือยัง?</p>
             </div>
 
-            <button onclick="startSession()" id="btn-start" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl shadow-lg text-xl font-bold transition transform active:scale-95 flex items-center justify-center gap-2">
-                <i class="fas fa-play"></i> เริ่มทบทวน
+            <button onclick="startSession()" id="btn-start" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl shadow-lg text-xl font-bold transition transform active:scale-95 flex items-center justify-center gap-2 opacity-50 pointer-events-none">
+                <i class="fas fa-play"></i> ไม่มีคิวทบทวน
             </button>
 
-            <div class="w-full border-t border-gray-700 pt-4">
-                <button onclick="document.getElementById('csvInput').click()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-xl border border-gray-700 text-sm font-semibold transition">
-                    <i class="fas fa-file-import mr-2"></i> นำเข้าการ์ดใหม่ (CSV)
+            <div class="w-full border-t border-gray-700 pt-4 mt-4">
+                <button onclick="document.getElementById('csvInput').click()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-300 py-3 rounded-xl border border-gray-700 text-sm font-semibold transition flex items-center justify-center">
+                    <i class="fas fa-file-csv mr-2 text-green-400"></i> นำเข้า CSV
                 </button>
                 <input type="file" id="csvInput" accept=".csv" class="hidden" onchange="handleFileUpload(this)">
             </div>
         </div>
 
-        <div id="scene-study" class="absolute inset-0 flex flex-col p-6 hidden">
-            <div class="w-full bg-gray-700 h-1 rounded-full mb-6">
-                <div id="progress-bar" class="bg-indigo-500 h-1 rounded-full w-0 transition-all duration-300"></div>
+        <div id="scene-study" class="absolute inset-0 flex flex-col p-6 hidden bg-gray-900">
+            <div class="flex justify-between text-xs text-gray-400 mb-2">
+                <span><i class="fas fa-layer-group mr-1"></i>เหลือ: <span id="queue-remain">0</span></span>
+                <span><i class="fas fa-history mr-1"></i>Streak: <span id="current-streak">0</span></span>
+            </div>
+            <div class="w-full bg-gray-700 h-1.5 rounded-full mb-6 overflow-hidden">
+                <div id="progress-bar" class="bg-indigo-500 h-full w-0 transition-all duration-300 ease-out"></div>
             </div>
 
-            <div class="flex-1 relative perspective-1000 group cursor-pointer no-tap-highlight" onclick="flipCard()">
+            <div class="flex-1 relative perspective-1000 group cursor-pointer no-tap-highlight z-20" onclick="flipCard()">
                 <div id="card-inner" class="relative w-full h-full text-center transition-transform duration-500 transform-style-3d shadow-2xl rounded-2xl">
-                    
-                    <div class="absolute inset-0 w-full h-full bg-gray-800 rounded-2xl border-2 border-indigo-900 flex flex-col items-center justify-center p-6 backface-hidden">
-                        <span class="text-xs text-indigo-400 uppercase tracking-widest mb-2">คำถาม</span>
-                        <h2 id="card-front" class="text-3xl font-bold text-white leading-relaxed">...</h2>
-                        <p class="text-gray-500 text-xs mt-4 absolute bottom-6">แตะเพื่อดูเฉลย</p>
+                    <div class="absolute inset-0 w-full h-full bg-gray-800 rounded-2xl border border-gray-700 flex flex-col items-center justify-center p-6 backface-hidden shadow-black/50 shadow-xl">
+                        <span class="text-xs text-indigo-400 uppercase tracking-widest mb-4 bg-indigo-900/30 px-2 py-1 rounded">คำถาม</span>
+                        <h2 id="card-front" class="text-3xl font-bold text-white leading-relaxed">Loading...</h2>
+                        <p class="text-gray-500 text-xs mt-6 absolute bottom-6 animate-pulse">แตะเพื่อดูเฉลย</p>
                     </div>
-
-                    <div class="absolute inset-0 w-full h-full bg-indigo-900 rounded-2xl border-2 border-indigo-700 flex flex-col items-center justify-center p-6 backface-hidden rotate-y-180">
-                        <span class="text-xs text-indigo-300 uppercase tracking-widest mb-2">เฉลย</span>
-                        <h2 id="card-back" class="text-3xl font-bold text-white leading-relaxed">...</h2>
+                    <div class="absolute inset-0 w-full h-full bg-indigo-900 rounded-2xl border border-indigo-700 flex flex-col items-center justify-center p-6 backface-hidden rotate-y-180 shadow-black/50 shadow-xl">
+                        <span class="text-xs text-indigo-200 uppercase tracking-widest mb-4 bg-indigo-800/50 px-2 py-1 rounded">เฉลย</span>
+                        <h2 id="card-back" class="text-3xl font-bold text-white leading-relaxed">Answer</h2>
                     </div>
                 </div>
             </div>
 
-            <div id="controls" class="mt-6 grid grid-cols-4 gap-2 opacity-0 pointer-events-none transition-opacity duration-300">
-                <button onclick="rateCard(1)" class="bg-red-900/80 text-red-200 py-3 rounded-lg font-bold text-sm active:scale-95">Again<br><span class="text-xs font-normal opacity-70">1m</span></button>
-                <button onclick="rateCard(2)" class="bg-yellow-900/80 text-yellow-200 py-3 rounded-lg font-bold text-sm active:scale-95">Hard<br><span class="text-xs font-normal opacity-70">2d</span></button>
-                <button onclick="rateCard(3)" class="bg-green-900/80 text-green-200 py-3 rounded-lg font-bold text-sm active:scale-95">Good<br><span class="text-xs font-normal opacity-70">4d</span></button>
-                <button onclick="rateCard(4)" class="bg-blue-900/80 text-blue-200 py-3 rounded-lg font-bold text-sm active:scale-95">Easy<br><span class="text-xs font-normal opacity-70">7d</span></button>
+            <div id="controls" class="mt-6 grid grid-cols-4 gap-3 opacity-0 pointer-events-none transition-all duration-300 transform translate-y-4">
+                <button onclick="rateCard(1)" class="bg-red-900/40 border border-red-900/50 text-red-200 py-4 rounded-xl font-bold text-sm active:bg-red-800 active:scale-95 transition-all">
+                    Again<br><span id="label-again" class="text-[10px] font-normal opacity-70">1m</span>
+                </button>
+                <button onclick="rateCard(2)" class="bg-yellow-900/40 border border-yellow-900/50 text-yellow-200 py-4 rounded-xl font-bold text-sm active:bg-yellow-800 active:scale-95 transition-all">
+                    Hard<br><span id="label-hard" class="text-[10px] font-normal opacity-70">2d</span>
+                </button>
+                <button onclick="rateCard(3)" class="bg-green-900/40 border border-green-900/50 text-green-200 py-4 rounded-xl font-bold text-sm active:bg-green-800 active:scale-95 transition-all">
+                    Good<br><span id="label-good" class="text-[10px] font-normal opacity-70">3d</span>
+                </button>
+                <button onclick="rateCard(4)" class="bg-blue-900/40 border border-blue-900/50 text-blue-200 py-4 rounded-xl font-bold text-sm active:bg-blue-800 active:scale-95 transition-all">
+                    Easy<br><span id="label-easy" class="text-[10px] font-normal opacity-70">5d</span>
+                </button>
             </div>
         </div>
 
-        <div id="scene-finished" class="absolute inset-0 flex flex-col items-center justify-center p-6 hidden text-center">
-            <i class="fas fa-check-circle text-6xl text-green-500 mb-4 animate-bounce"></i>
-            <h2 class="text-3xl font-bold text-white">ยอดเยี่ยม!</h2>
-            <p class="text-gray-400 mt-2">คุณทบทวนครบทุกใบแล้ว</p>
-            <p class="text-gray-500 text-sm mt-8">กลับมาใหม่พรุ่งนี้นะ</p>
-            <button onclick="goHome()" class="mt-8 bg-gray-700 px-6 py-3 rounded-full text-white">กลับหน้าหลัก</button>
+        <div id="scene-finished" class="absolute inset-0 flex flex-col items-center justify-center p-6 hidden text-center bg-gray-900">
+            <div class="w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center mb-6 animate-pulse-green">
+                <i class="fas fa-check text-5xl text-green-400"></i>
+            </div>
+            <h2 class="text-3xl font-bold text-white mb-2">ภารกิจเสร็จสิ้น!</h2>
+            <p class="text-gray-400">วันนี้สมองคุณแข็งแกร่งขึ้นแล้ว</p>
+            <div class="mt-8 grid grid-cols-2 gap-4 w-full text-center">
+                <div class="bg-gray-800 p-4 rounded-xl">
+                    <div id="stat-reviewed" class="text-2xl font-bold text-indigo-400">0</div>
+                    <div class="text-xs text-gray-500">การ์ดที่เรียน</div>
+                </div>
+                <div class="bg-gray-800 p-4 rounded-xl">
+                    <div id="stat-tomorrow" class="text-2xl font-bold text-green-400">0</div>
+                    <div class="text-xs text-gray-500">คิวพรุ่งนี้</div>
+                </div>
+            </div>
+            <button onclick="goHome()" class="mt-8 bg-indigo-600 w-full py-4 rounded-xl font-bold text-white shadow-lg">กลับหน้าหลัก</button>
         </div>
 
     </main>
 
     <script>
-        // --- 1. DATA & STATE MANAGEMENT ---
-        let deck = JSON.parse(localStorage.getItem('legendaryDeck')) || [];
+        // --- 1. CORE DATA STRUCTURE ---
+        let deck = JSON.parse(localStorage.getItem('legendaryDeckV2')) || [];
+        // การตั้งค่าคงที่ (Configuration)
+        const SETTINGS = {
+            LEARNING_STEPS: [1, 10], // นาที (Again, Good สำหรับการ์ดใหม่)
+            GRADUATING_INTERVAL: 1,  // วัน (หลังจากจบ Learning)
+            EASY_BONUS: 1.3,         // คูณเพิ่มถ้าตอบ Easy
+            INTERVAL_MODIFIER: 1.0,  // ปรับความยากรวม (1.0 = ปกติ)
+            MAX_INTERVAL: 36500      // 100 ปี
+        };
+
+        // ตัวแปร Session
         let sessionQueue = [];
         let currentCard = null;
         let isFlipped = false;
+        let sessionStats = { reviewed: 0, new: 0 };
 
-        // อัปเดตหน้าจอเมื่อเปิดแอป
         updateDashboard();
 
-        // --- 2. CSV IMPORT SYSTEM ---
-        function handleFileUpload(input) {
-            const file = input.files[0];
-            if (!file) return;
-            Papa.parse(file, {
-                complete: function(results) {
-                    let newCards = 0;
-                    results.data.forEach(row => {
-                        if(row.length >= 2 && row[0]) {
-                            // สร้าง Card Object ใหม่
-                            deck.push({
-                                id: Date.now() + Math.random(),
-                                front: row[0],
-                                back: row[1],
-                                nextReview: Date.now(), // พร้อมเรียนทันที
-                                interval: 0,
-                                ease: 2.5, // ค่ามาตรฐาน SM-2
-                                streak: 0
-                            });
-                            newCards++;
-                        }
-                    });
-                    saveDeck();
-                    alert(`นำเข้าสำเร็จ ${newCards} ใบ!`);
-                    updateDashboard();
-                },
-                header: false,
-                skipEmptyLines: true
-            });
-        }
+        // --- 2. THE LEGENDARY ALGORITHM (Modified SM-2 with Fuzzing & Lapse) ---
+        
+        function calculateAlgorithm(card, rating) {
+            // Cloning card เพื่อไม่ให้กระทบ Object จริงจนกว่าจะ Save
+            let next = { ...card };
+            const now = Date.now();
+            const ONE_MIN = 60 * 1000;
+            const ONE_DAY = 24 * 60 * 60 * 1000;
 
-        function saveDeck() {
-            localStorage.setItem('legendaryDeck', JSON.stringify(deck));
-        }
-
-        function resetData() {
-            if(confirm('ลบข้อมูลการ์ดทั้งหมด?')) {
-                localStorage.removeItem('legendaryDeck');
-                deck = [];
-                updateDashboard();
-            }
-        }
-
-        // --- 3. SPACED REPETITION ENGINE (SM-2 Algorithm) ---
-        function calculateNextReview(card, quality) {
-            // Quality: 1=Again, 2=Hard, 3=Good, 4=Easy
-            
-            if (quality === 1) {
-                card.streak = 0;
-                card.interval = 1; // 1 วัน (หรือจริงๆ ควรเป็นนาทีแต่เพื่อให้ง่ายเอาเป็น 1 วันก่อน)
-            } else {
-                // สูตร SM-2
-                if (card.streak === 0) card.interval = 1;
-                else if (card.streak === 1) card.interval = 6;
-                else card.interval = Math.round(card.interval * card.ease);
+            // -- Logic 1: NEW / LEARNING PHASE (การ์ดใหม่ หรือ การ์ดที่เพิ่งลืม) --
+            if (next.state === 'new' || next.state === 'learning') {
+                if (rating === 1) { // Again
+                    next.stepIndex = 0; // กลับไปเริ่ม Step แรก (1 นาที)
+                    next.nextReview = now + (SETTINGS.LEARNING_STEPS[0] * ONE_MIN);
+                    next.state = 'learning';
+                } else if (rating === 2) { // Hard (ข้าม Step ไม่ได้)
+                    next.nextReview = now + (SETTINGS.LEARNING_STEPS[next.stepIndex] * ONE_MIN * 1.5); // ยืดเวลาเฉยๆ
+                    // state เดิม
+                } else if (rating === 3) { // Good
+                    next.stepIndex++;
+                    if (next.stepIndex >= SETTINGS.LEARNING_STEPS.length) {
+                        // Graduated! (เรียนจบแล้ว เป็นไท)
+                        next.state = 'review';
+                        next.interval = SETTINGS.GRADUATING_INTERVAL;
+                        next.nextReview = now + (next.interval * ONE_DAY);
+                    } else {
+                        // ไป Step ต่อไป (เช่น 10 นาที)
+                        next.nextReview = now + (SETTINGS.LEARNING_STEPS[next.stepIndex] * ONE_MIN);
+                        next.state = 'learning';
+                    }
+                } else if (rating === 4) { // Easy (ข้ามชั้นทันที)
+                    next.state = 'review';
+                    next.interval = 4; // Bonus เริ่มต้น 4 วัน
+                    next.nextReview = now + (next.interval * ONE_DAY);
+                }
+            } 
+            // -- Logic 2: REVIEW PHASE (การ์ดที่จำได้แล้ว) --
+            else if (next.state === 'review') {
+                if (rating === 1) { // Again (Lapse !! - จุดสำคัญที่แก้ Code เดิม)
+                    next.state = 'learning'; // ตกชั้นกลับมาเรียนใหม่
+                    next.stepIndex = 0;
+                    next.nextReview = now + (SETTINGS.LEARNING_STEPS[0] * ONE_MIN);
+                    
+                    // *New Logic*: ลด Interval ลง 50% แทนที่จะเหลือ 0 (Retention)
+                    next.interval = Math.max(1, Math.round(next.interval * 0.50)); 
+                    next.ease = Math.max(1.3, next.ease - 0.2); // ลงโทษ Ease Factor
+                } 
+                else if (rating === 2) { // Hard (Ease Hell Prevention)
+                    next.interval = Math.max(1, Math.round(next.interval * 1.2)); // คูณคงที่
+                    next.ease = Math.max(1.3, next.ease - 0.15); // ลด Ease นิดหน่อย
+                    next.nextReview = now + (next.interval * ONE_DAY);
+                } 
+                else if (rating === 3) { // Good (Standard)
+                    next.interval = Math.round(next.interval * next.ease);
+                    next.nextReview = now + (next.interval * ONE_DAY);
+                    // Ease เท่าเดิม (Stable)
+                } 
+                else if (rating === 4) { // Easy (Bonus)
+                    next.interval = Math.round(next.interval * next.ease * SETTINGS.EASY_BONUS);
+                    next.ease += 0.15; // เพิ่ม Ease
+                    next.nextReview = now + (next.interval * ONE_DAY);
+                }
                 
-                card.streak++;
-                // ปรับ Ease Factor
-                card.ease = card.ease + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
-                if (card.ease < 1.3) card.ease = 1.3;
+                // -- Logic 3: FUZZING (กระจายวันไม่ให้กองรวมกัน) --
+                if (rating > 1 && next.interval > 3) {
+                    const fuzzFactor = 0.05; // 5%
+                    const fuzz = Math.round(next.interval * fuzzFactor); 
+                    const randomDays = Math.floor(Math.random() * (fuzz * 2 + 1)) - fuzz; // สุ่ม -fuzz ถึง +fuzz
+                    next.nextReview += (randomDays * ONE_DAY);
+                }
             }
 
-            // ตั้งเวลา Review ครั้งหน้า (มิลลิวินาที)
-            // หมายเหตุ: เพื่อการทดสอบ ให้หน่วยเป็น "นาที" แทน "วัน" ในโค้ดจริงให้เปลี่ยน 60000 เป็น 86400000 (24ชม)
-            // แต่เพื่อให้เห็นผลใน Demo นี้ ผมจะใช้หน่วยเป็น "วินาที * ตัวคูณ"
-            // *** โหมด Production: เปลี่ยนตัวคูณด้านล่างเป็น 24 * 60 * 60 * 1000 ***
-            const ONE_DAY_MS = 24 * 60 * 60 * 1000; 
-            card.nextReview = Date.now() + (card.interval * ONE_DAY_MS);
-            
-            return card;
+            return next;
         }
 
-        // --- 4. GAMEPLAY LOGIC ---
+        // --- 3. UI & EVENTS ---
+
         function updateDashboard() {
             const now = Date.now();
             const dueCount = deck.filter(c => c.nextReview <= now).length;
             
             document.getElementById('due-counter').innerText = `รอทบทวน: ${dueCount} ใบ`;
+            document.getElementById('stats-text').innerText = `ทั้งหมด ${deck.length} ใบ | จำได้แล้ว ${deck.filter(c=>c.state==='review').length} ใบ`;
             
             const btnStart = document.getElementById('btn-start');
+            const badge = document.getElementById('badge-count');
+            
             if(dueCount > 0) {
-                btnStart.classList.remove('opacity-50', 'pointer-events-none');
+                btnStart.classList.remove('opacity-50', 'pointer-events-none', 'bg-gray-600');
+                btnStart.classList.add('bg-indigo-600');
                 btnStart.innerHTML = `<i class="fas fa-play"></i> เริ่มทบทวน (${dueCount})`;
+                badge.classList.remove('hidden');
+                badge.innerText = dueCount;
             } else {
-                btnStart.classList.add('opacity-50', 'pointer-events-none');
+                btnStart.classList.add('opacity-50', 'pointer-events-none', 'bg-gray-600');
+                btnStart.classList.remove('bg-indigo-600');
                 btnStart.innerHTML = `<i class="fas fa-check"></i> ว่างเปล่า`;
+                badge.classList.add('hidden');
             }
         }
 
         function startSession() {
             const now = Date.now();
-            sessionQueue = deck.filter(c => c.nextReview <= now);
+            // สร้างคิว: เอาการ์ดที่ถึงเวลา + เรียงลำดับ (การ์ดเรียนก่อน -> การ์ดทบทวน)
+            sessionQueue = deck.filter(c => c.nextReview <= now)
+                               .sort((a,b) => a.nextReview - b.nextReview);
+            
             if(sessionQueue.length === 0) return;
+            sessionStats.reviewed = 0;
 
             document.getElementById('scene-home').classList.add('hidden');
             document.getElementById('scene-study').classList.remove('hidden');
@@ -214,62 +270,146 @@
             currentCard = sessionQueue[0];
             isFlipped = false;
             
-            // Render Card
+            // Render
             document.getElementById('card-front').innerText = currentCard.front;
             document.getElementById('card-back').innerText = currentCard.back;
+            document.getElementById('current-streak').innerText = currentCard.streak || 0;
             
-            // Reset UI
+            // Reset UI Style
             const cardInner = document.getElementById('card-inner');
             cardInner.style.transform = 'rotateY(0deg)';
             
+            // Hide Controls
             const controls = document.getElementById('controls');
-            controls.classList.add('opacity-0', 'pointer-events-none');
+            controls.classList.remove('translate-y-0', 'opacity-100', 'pointer-events-auto');
+            controls.classList.add('translate-y-4', 'opacity-0', 'pointer-events-none');
             
-            // Update Progress
-            const total = deck.filter(c => c.nextReview <= Date.now()).length + sessionQueue.length; // ประมาณการ
-            // (ในที่นี้ทำ Progress Bar แบบง่ายๆ)
+            // Update Top Bar
+            document.getElementById('queue-remain').innerText = sessionQueue.length;
+            
+            // Pre-calculate Labels (แสดง User ว่ากดแล้วจะไปเจอกันอีกเมื่อไหร่)
+            updateButtonLabels();
+        }
+
+        function updateButtonLabels() {
+            // คำนวณล่วงหน้าเพื่อโชว์ที่ปุ่ม
+            const ratings = [1, 2, 3, 4];
+            const ids = ['again', 'hard', 'good', 'easy'];
+            
+            ratings.forEach((r, i) => {
+                const simulated = calculateAlgorithm(currentCard, r);
+                const diffMs = simulated.nextReview - Date.now();
+                let label = "";
+                
+                const min = 60 * 1000;
+                const hour = 60 * min;
+                const day = 24 * hour;
+
+                if (diffMs < hour) label = Math.round(diffMs/min) + "m";
+                else if (diffMs < day) label = Math.round(diffMs/hour) + "h";
+                else label = Math.round(diffMs/day) + "d";
+                
+                document.getElementById('label-' + ids[i]).innerText = label;
+            });
         }
 
         function flipCard() {
-            if(isFlipped) return; // พลิกแล้วห้ามพลิกกลับ
+            if(isFlipped) return;
             isFlipped = true;
-            
             document.getElementById('card-inner').style.transform = 'rotateY(180deg)';
             
-            // Show Controls
+            // Show Controls with Animation
             const controls = document.getElementById('controls');
-            controls.classList.remove('opacity-0', 'pointer-events-none');
+            controls.classList.remove('translate-y-4', 'opacity-0', 'pointer-events-none');
+            controls.classList.add('translate-y-0', 'opacity-100', 'pointer-events-auto');
         }
 
-        function rateCard(quality) {
-            // คำนวณวันถัดไป
-            calculateNextReview(currentCard, quality);
+        function rateCard(rating) {
+            // 1. คำนวณค่าใหม่
+            const updatedCard = calculateAlgorithm(currentCard, rating);
             
-            // บันทึก
-            // หา Index ของการ์ดใบนี้ใน Deck หลักแล้วอัปเดต
+            // 2. อัปเดตใน Deck หลัก
             const index = deck.findIndex(c => c.id === currentCard.id);
-            if(index !== -1) deck[index] = currentCard;
+            if(index !== -1) deck[index] = updatedCard;
             saveDeck();
+            sessionStats.reviewed++;
 
-            // เอาออกจากคิวปัจจุบัน
-            sessionQueue.shift();
+            // 3. จัดการคิว (Logic สำคัญ: Relearning Queue)
+            sessionQueue.shift(); // เอาใบเก่าออก
             
-            // โหลดใบต่อไป
+            const now = Date.now();
+            if (updatedCard.nextReview <= now + (10 * 60 * 1000)) {
+                // ถ้าต้องทบทวนอีกใน < 10 นาที (เช่นกด Again) -> ให้วนกลับมาต่อท้ายคิวทันที!
+                sessionQueue.push(updatedCard);
+                // เรียงคิวใหม่
+                sessionQueue.sort((a,b) => a.nextReview - b.nextReview);
+            }
+
+            // 4. ไปใบต่อไป
             loadNextCard();
+        }
+
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            Papa.parse(file, {
+                complete: function(results) {
+                    let count = 0;
+                    results.data.forEach(row => {
+                        if(row.length >= 2 && row[0]) {
+                            deck.push({
+                                id: Date.now() + Math.random(),
+                                front: row[0],
+                                back: row[1],
+                                state: 'new',    // สถานะ: new, learning, review
+                                stepIndex: 0,    // ขั้นบันไดการเรียนรู้
+                                nextReview: Date.now(),
+                                interval: 0,     // วัน
+                                ease: 2.5,       // ความจำ
+                                streak: 0
+                            });
+                            count++;
+                        }
+                    });
+                    saveDeck();
+                    alert(`นำเข้าสำเร็จ ${count} ใบ!`);
+                    updateDashboard();
+                },
+                header: false,
+                skipEmptyLines: true
+            });
         }
 
         function finishSession() {
             document.getElementById('scene-study').classList.add('hidden');
             document.getElementById('scene-finished').classList.remove('hidden');
-            updateDashboard();
+            
+            document.getElementById('stat-reviewed').innerText = sessionStats.reviewed;
+            // นับจำนวนที่จะโผล่มาพรุ่งนี้
+            const tomorrow = Date.now() + (24 * 60 * 60 * 1000);
+            const tmrCount = deck.filter(c => c.nextReview > Date.now() && c.nextReview <= tomorrow).length;
+            document.getElementById('stat-tomorrow').innerText = tmrCount;
         }
 
         function goHome() {
             document.getElementById('scene-finished').classList.add('hidden');
             document.getElementById('scene-home').classList.remove('hidden');
+            updateDashboard();
         }
 
-        // Service Worker (Keep existing)
+        function saveDeck() {
+            localStorage.setItem('legendaryDeckV2', JSON.stringify(deck));
+        }
+
+        function resetData() {
+            if(confirm('ลบข้อมูลทั้งหมด?')) {
+                localStorage.removeItem('legendaryDeckV2');
+                deck = [];
+                updateDashboard();
+            }
+        }
+        
+        // Register SW
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js');
         }
