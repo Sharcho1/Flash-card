@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Legendary Flashcards</title>
+    
+    <link rel="manifest" href="manifest.json">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FlashCard">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1903/1903162.png">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 h-screen flex flex-col items-center justify-center">
+
+    <div class="text-center p-5">
+        <h1 class="text-4xl font-bold text-indigo-600 mb-4">Legendary Cards</h1>
+        <p class="text-gray-600 mb-8">ระบบพร้อมแล้ว... รอรับไฟล์ CSV</p>
+        
+        <button class="bg-indigo-600 text-white px-6 py-3 rounded-full shadow-lg hover:bg-indigo-700 transition">
+            + Import CSV
+        </button>
+    </div>
+
+    <script>
+        // ลงทะเบียน Service Worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+            .then(() => console.log('Service Worker Registered!'))
+            .catch((err) => console.log('SW Failed:', err));
+        }
+    </script>
+</body>
+</html>
